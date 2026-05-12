@@ -1,0 +1,13 @@
+track,point,x,y,distance_m
+Australia,start_finish,-1240.31,-1290.59,0.0
+Australia,s1_s2_boundary,-3200.0,11417.0,1743.0
+Australia,s2_s3_boundary,1887.41,1435.25,3132.36
+Japan,start_finish,1607.95,-541.28,0.0
+Japan,s1_s2_boundary,-3354.0,-1625.0,2175.09
+Japan,s2_s3_boundary,-7632.0,-1032.0,4714.42
+China,start_finish,190.38,-1462.94,0.0
+China,s1_s2_boundary,-6366.0,2187.0,1408.35
+China,s2_s3_boundary,-1102.0,5034.0,2959.18
+Miami,start_finish,1869.26,108.29,0.0
+Miami,s1_s2_boundary,-2492.0,-4039.0,1797.18
+Miami,s2_s3_boundary,9049.06,694.36,3664.11
