@@ -1,0 +1,70 @@
+# Regenerate dashboard CSVs from FastF1 and commit to the repo.
+# After push: run `npm run deploy` (or your Firebase workflow) to publish updated data.
+#
+# Manual run: GitHub → Actions → "Refresh F1 data (FastF1)" → Run workflow
+
+name: Refresh F1 data (FastF1)
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: "Comma-separated years (e.g. 2025,2026). Leave empty for all configured years."
+        required: false
+        default: ""
+  schedule:
+    # Mondays 06:00 UTC — day after most European race weekends
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache FastF1 HTTP cache
+        uses: actions/cache@v4
+        with:
+          path: .fastf1-cache
+          key: fastf1-cache-${{ runner.os }}-py3.12-${{ hashFiles('scripts/requirements-data.txt') }}
+          restore-keys: |
+            fastf1-cache-${{ runner.os }}-py3.12-
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/requirements-data.txt
+
+      - name: Collect data from FastF1
+        env:
+          YEARS_INPUT: ${{ github.event.inputs.years }}
+        run: |
+          set -e
+          if [ -n "$YEARS_INPUT" ]; then
+            python scripts/collect_fastf1_data.py --years "$YEARS_INPUT"
+          else
+            python scripts/collect_fastf1_data.py
+          fi
+
+      - name: Commit and push updated CSVs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/speed_metrics_final.csv \
+                  public/data/fastest_laps_telemetry.csv \
+                  public/data/drs_telemetry_data_miami.csv
+          if git diff --staged --quiet; then
+            echo "No data file changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(data): refresh CSVs from FastF1 [skip ci]"
+          git push

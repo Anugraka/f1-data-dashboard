@@ -1,5 +1,7 @@
 Put data files here so the dashboard can fetch them at runtime.
 
+To regenerate lap/telemetry CSVs from FastF1 via GitHub Actions, see [docs/DATA_REFRESH.md](../../docs/DATA_REFRESH.md).
+
 ## Lap times CSV
 
 Save your FastF1-exported lap times CSV as:

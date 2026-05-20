@@ -37,19 +37,19 @@ const ENERGY_OPTIONS: { id: EnergyOptionId; label: string; description: string }
     id: 'boost',
     label: 'Boost',
     description:
-      'Boost: Boost Mode allows drivers to activate energy deployment at any point in the lap. When engaged, it will trigger a change in power unit power settings, either returning to maximum power or a profile configured by the team as per their personal choice. The boost could, in theory, either help them defend from a car behind or attack a car ahead providing they have saved enough charge. It can be used all at once or spread across the lap, depending on when they have the best chance to attack or where they are most vulnerable.',
+      'Boost Mode allows drivers to activate energy deployment at any point in the lap. When engaged, it will trigger a change in power unit power settings, either returning to maximum power or a profile configured by the team as per their personal choice. The boost could, in theory, either help them defend from a car behind or attack a car ahead providing they have saved enough charge. It can be used all at once or spread across the lap, depending on when they have the best chance to attack or where they are most vulnerable.',
   },
   {
     id: 'overtake',
     label: 'Overtake',
     description:
-      'Overtake: Overtake Mode allows a driver to recharge an extra +0.5MJ (megajoules) and generate an additional electrical power profile to allow them to sustain a higher speed for a longer period. It can only be activated when a driver is within a second of the car in front at the detection point, which is nominally the final corner. It can only be used on the following lap. Its use will be most effective on longer straights as the delta speed it will deliver should have a greater effect on closing the distance between the two competing cars.',
+      'Overtake Mode allows a driver to recharge an extra +0.5MJ (megajoules) and generate an additional electrical power profile to allow them to sustain a higher speed for a longer period. It can only be activated when a driver is within a second of the car in front at the detection point, which is nominally the final corner. It can only be used on the following lap. Its use will be most effective on longer straights as the delta speed it will deliver should have a greater effect on closing the distance between the two competing cars.',
   },
   {
     id: 'recharge',
     label: 'Recharge',
     description:
-      "Recharge: Recharge Mode will be automated by use of selectable recharge maps and targets. Cars will harvest energy to charge the battery when braking, on part throttle, when lifting off (when a driver lifts off the throttle early) or when 'super clipping' (when some harvesting happens at the end of the straight when a car is still at full throttle). The only Recharge mode the driver will have direct control of will be lift-off regen, whereby if the driver lifts off, then they can recharge their battery. However, doing this will disable the Active devices as well.",
+      "Recharge Mode will be automated by use of selectable recharge maps and targets. Cars will harvest energy to charge the battery when braking, on part throttle, when lifting off (when a driver lifts off the throttle early) or when 'super clipping' (when some harvesting happens at the end of the straight when a car is still at full throttle). The only Recharge mode the driver will have direct control of will be lift-off regen, whereby if the driver lifts off, then they can recharge their battery. However, doing this will disable the Active devices as well.",
   },
 ]
 
