@@ -1,5 +1,5 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { ENGINE_COLORS } from '../data/circuits'
+import { ENGINE_COLORS } from '../data/engineColors'
 import type { EngineManufacturer } from '../types'
 
 /** 2022 grid: engine supplier → teams (from user spec). */

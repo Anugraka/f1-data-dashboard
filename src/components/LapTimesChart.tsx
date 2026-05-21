@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { ENGINE_COLORS } from '../data/circuits'
+import { ENGINE_COLORS } from '../data/engineColors'
 import type { EngineManufacturer, TeamLap, YearBestTeamLap } from '../types'
 
 function enginesForLegend(engines: EngineManufacturer[]): EngineManufacturer[] {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { circuits } from './data/circuits'
+import { discoverCircuitsFromData } from './data/discoverCircuits'
 import { CircuitMapCard, MODE_OPTIONS } from './components/CircuitMapCard'
 import { OvertakeDynamicsChart } from './components/OvertakeDynamicsChart'
 import { LapTimesChart } from './components/LapTimesChart'
@@ -15,15 +15,10 @@ import {
   yearsForRaceUi,
   type SectorKey,
 } from './data/laptimes'
-import {
-  CIRCUIT_ID_TO_SECTOR_CSV_TRACK,
-  loadSectorPositionsCsv,
-  type SectorBoundaries,
-} from './data/sectorPositions'
+import { loadSectorPositionsCsv, type SectorBoundaries } from './data/sectorPositions'
 import {
   loadDrsTelemetryMiamiCsv,
   loadFastestLapsTelemetryCsv,
-  speedChartYearsForCircuit,
   speedBoxPlotSeriesForTrack,
   type SpeedSectorScope,
   type TelemetryPoint,
@@ -31,10 +26,6 @@ import {
 import { loadOvertakeDataCsv, overtakesForRace } from './data/overtakes'
 
 const SECTOR_LABELS = ['Full Lap', 'Sector 1', 'Sector 2', 'Sector 3'] as const
-
-/** Shown under lap / speed / overtake chart titles when Shanghai is selected. */
-const SHANGHAI_GP_CANCEL_NOTE =
-  'Note: The Chinese Grand Prix was cancelled in 2022 and 2023 due to ongoing COVID-19 restrictions.'
 
 type UiSector = (typeof SECTOR_LABELS)[number]
 type UiMode = (typeof MODE_OPTIONS)[number]
@@ -62,16 +53,29 @@ function App() {
   const [overtakeRows, setOvertakeRows] = useState<Awaited<ReturnType<typeof loadOvertakeDataCsv>> | null>(null)
   const [overtakeError, setOvertakeError] = useState<string | null>(null)
   const [sectorPositionsMap, setSectorPositionsMap] = useState<Map<string, SectorBoundaries> | null>(null)
+
+  const circuits = useMemo(() => {
+    if (!lapRows.length || !telemetryRows?.length) return []
+    return discoverCircuitsFromData(lapRows, telemetryRows, sectorPositionsMap)
+  }, [lapRows, telemetryRows, sectorPositionsMap])
+
   const circuit = useMemo(
     () => circuits.find((c) => c.id === selectedId) ?? circuits[0],
-    [selectedId],
+    [circuits, selectedId],
   )
 
-  const raceName = circuit.fastF1RaceName ?? ''
+  useEffect(() => {
+    if (circuits.length === 0) return
+    if (!circuits.some((c) => c.id === selectedId)) {
+      setSelectedId(circuits[0].id)
+    }
+  }, [circuits, selectedId])
+
+  const raceName = circuit?.fastF1RaceName ?? ''
 
   const yearOptions = useMemo(
-    () => (raceName ? yearsForRaceUi(lapRows, raceName, circuit.id) : []),
-    [lapRows, raceName, circuit.id],
+    () => (raceName ? yearsForRaceUi(lapRows, raceName, circuit?.lapUiYearAllowlist) : []),
+    [lapRows, raceName, circuit?.lapUiYearAllowlist],
   )
 
   useEffect(() => {
@@ -201,17 +205,28 @@ function App() {
     })
   }, [raceName, lapRows, sector, resolvedLapYear, yearOptions])
 
-  const speedChartYears = useMemo(() => speedChartYearsForCircuit(circuit.id), [circuit.id])
+  const speedChartYears = useMemo((): readonly number[] => {
+    if (circuit?.speedChartYearAllowlist?.length) return circuit.speedChartYearAllowlist
+    const track = circuit?.fastF1RaceName?.trim()
+    if (!track || !telemetryRows) return []
+    const years = new Set<number>()
+    for (const p of telemetryRows) {
+      if ((p.track ?? '').trim() !== track) continue
+      const y = Number((p.year ?? '').trim())
+      if (Number.isFinite(y)) years.add(y)
+    }
+    return [...years].sort((a, b) => a - b)
+  }, [circuit?.fastF1RaceName, circuit?.speedChartYearAllowlist, telemetryRows])
 
   const sectorStartFinish = useMemo(() => {
-    const csvTrack = CIRCUIT_ID_TO_SECTOR_CSV_TRACK[circuit.id]
+    const csvTrack = circuit?.sectorCsvTrack
     if (!csvTrack || !sectorPositionsMap) return null
     return sectorPositionsMap.get(csvTrack)?.startFinish ?? null
-  }, [circuit.id, sectorPositionsMap])
+  }, [circuit?.sectorCsvTrack, sectorPositionsMap])
 
   /** One peak speed per chart year; sector matches the map (full lap or S1–S3). */
   const speedSeries = useMemo(() => {
-    const track = circuit.fastF1RaceName
+    const track = circuit?.fastF1RaceName
     if (!track || !telemetryRows) return []
     return speedBoxPlotSeriesForTrack(
       telemetryRows,
@@ -220,17 +235,17 @@ function App() {
       speedChartYears,
       sectorStartFinish,
     )
-  }, [circuit.fastF1RaceName, telemetryRows, speedChartYears, sector, sectorStartFinish])
+  }, [circuit?.fastF1RaceName, telemetryRows, speedChartYears, sector, sectorStartFinish])
 
   const speedChartTitle = useMemo(() => {
-    const raw = circuit.fastF1RaceName?.trim()
+    const raw = circuit?.fastF1RaceName?.trim()
     const gpPart = raw
       ? /Grand Prix$/i.test(raw)
         ? raw
         : `${raw} Grand Prix`
-      : `${circuit.name} Grand Prix`
+      : `${circuit?.name ?? 'Circuit'} Grand Prix`
     return `Speed Distribution of Fastest Lap per Year - ${gpPart}`
-  }, [circuit.fastF1RaceName, circuit.name])
+  }, [circuit?.fastF1RaceName, circuit?.name])
 
   const overtakesForCircuit = useMemo(() => {
     if (!raceName || overtakeRows === null) return []
@@ -255,25 +270,31 @@ function App() {
   }, [raceName, lapRows, resolvedLapYear])
 
   const lapChartTitle = useMemo(() => {
-    const raceTitle = raceName || circuit.gpLabel
+    const raceTitle = raceName || circuit?.gpLabel || ''
     if (resolvedLapYear === 'all') {
       const raceStem = raceName
         ? raceName.replace(/\s+Grand Prix$/i, '').trim()
-        : circuit.gpLabel.replace(/^\d{4}\s+/i, '').replace(/\s+GP$/i, '').trim() || circuit.name
+        : (circuit?.gpLabel ?? '')
+            .replace(/^\d{4}\s+/i, '')
+            .replace(/\s+GP$/i, '')
+            .trim() || circuit?.name || 'Circuit'
       if (sector === 'Full Lap') {
         return `Fastest Average Lap per Year - ${raceStem} Grand Prix`
       }
       return `Fastest Average ${sector} per Year - ${raceStem} Grand Prix`
     }
     return `Average ${sector} Times by Team - ${resolvedLapYear ?? '…'} ${raceTitle}`
-  }, [circuit.gpLabel, circuit.name, raceName, resolvedLapYear, sector])
+  }, [circuit?.gpLabel, circuit?.name, raceName, resolvedLapYear, sector])
 
   const overtakeChartTitle = useMemo(() => {
     const raceStem = raceName
       ? raceName.replace(/\s+Grand Prix$/i, '').trim()
-      : circuit.gpLabel.replace(/^\d{4}\s+/i, '').replace(/\s+GP$/i, '').trim() || circuit.name
+      : (circuit?.gpLabel ?? '')
+          .replace(/^\d{4}\s+/i, '')
+          .replace(/\s+GP$/i, '')
+          .trim() || circuit?.name || 'Circuit'
     return `Overtaking Dynamics per Year - ${raceStem} Grand Prix`
-  }, [circuit.gpLabel, circuit.name, raceName])
+  }, [circuit?.gpLabel, circuit?.name, raceName])
 
   const lapChartEmpty =
     resolvedLapYear === 'all' ? allYearsData.length === 0 : teamData.length === 0
@@ -283,19 +304,14 @@ function App() {
   }, [sector])
 
   const lapChartFootnote = useMemo(() => {
-    if (circuit.id === 'australia') {
-      if (resolvedLapYear === 'all' || resolvedLapYear === '2025') {
-        return 'Note: The 2025 Australian Grand Prix was held in heavy rain conditions, which may have influenced the lap times recorded during that race.'
-      }
+    if (!circuit?.lapChartFootnote) return undefined
+    if (circuit.id === 'australia' && resolvedLapYear !== 'all' && resolvedLapYear !== '2025') {
       return undefined
     }
-    if (circuit.id === 'shanghai') {
-      return SHANGHAI_GP_CANCEL_NOTE
-    }
-    return undefined
-  }, [circuit.id, resolvedLapYear])
+    return circuit.lapChartFootnote
+  }, [circuit?.id, circuit?.lapChartFootnote, resolvedLapYear])
 
-  const shanghaiFootnoteForModes = circuit.id === 'shanghai' ? SHANGHAI_GP_CANCEL_NOTE : undefined
+  const chartFootnote = circuit?.chartFootnote
 
   return (
     <div className="flex min-h-screen bg-zinc-100/80">
@@ -315,12 +331,19 @@ function App() {
           subtitle={
             showHome
               ? 'Choose a circuit in the sidebar to view the laptime, speed, and overtake data.'
-              : `${circuit.fullName} · ${circuit.country}`
+              : circuit
+                ? `${circuit.fullName} · ${circuit.country}`
+                : 'Circuit data'
           }
         />
         <main className="flex flex-1 flex-col gap-6 p-6">
           {showHome ? (
             <HomePage />
+          ) : circuits.length === 0 ? (
+            <section className="rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm">
+              No circuits with both lap-time and telemetry data yet. Run the data refresh workflow or add CSVs
+              under <code className="font-mono">public/data/</code>.
+            </section>
           ) : (
             <>
               <CircuitMapCard
@@ -342,7 +365,7 @@ function App() {
                   years={speedChartYears}
                   loading={telemetryLoading}
                   error={telemetryError}
-                  footnote={shanghaiFootnoteForModes}
+                  footnote={chartFootnote}
                 />
               ) : mode === 'Overtake' ? (
                 <OvertakeDynamicsChart
@@ -350,7 +373,7 @@ function App() {
                   data={overtakesForCircuit}
                   loading={overtakeLoading}
                   error={overtakeError}
-                  footnote={shanghaiFootnoteForModes}
+                  footnote={chartFootnote}
                 />
               ) : lapRowsError ? (
                 <section className="rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-600 shadow-sm">

@@ -1,9 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import type { Circuit, TrackPoint } from '../types'
-import {
-  CIRCUIT_ID_TO_SECTOR_CSV_TRACK,
-  type SectorBoundaries,
-} from '../data/sectorPositions'
+import type { SectorBoundaries } from '../data/sectorPositions'
 import {
   closestVertexIndex,
   cumulativeDistancesM,
@@ -319,7 +316,7 @@ export function CircuitMapCard({
     return driver ? filtered.filter((p) => p.driver === driver) : filtered
   }, [circuit.fastF1RaceName, circuit.name, mode, telemetry])
 
-  const useMiamiDrsMap = circuit.id === 'miami' && mode === 'Overtake'
+  const useMiamiDrsMap = Boolean(circuit.useMiamiDrsTelemetry) && mode === 'Overtake'
 
   /**
    * Lap used for DRS segment coloring: Miami Overtake uses `miamiDrsTelemetry`; otherwise the filtered fastest-lap row set.
@@ -434,10 +431,10 @@ export function CircuitMapCard({
 
   const sectorPositionsForCircuit = useMemo(() => {
     if (!sectorPositionsMap) return null
-    const csvTrack = CIRCUIT_ID_TO_SECTOR_CSV_TRACK[circuit.id]
+    const csvTrack = circuit.sectorCsvTrack
     if (!csvTrack) return null
     return sectorPositionsMap.get(csvTrack) ?? null
-  }, [sectorPositionsMap, circuit.id])
+  }, [sectorPositionsMap, circuit.sectorCsvTrack])
 
   /** Vertex on the lap polyline closest to CSV start/finish (distance 0). Falls back to first sample if unknown. */
   const lapSectorAnchorK = useMemo(() => {

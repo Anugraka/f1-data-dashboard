@@ -48,4 +48,16 @@ export interface Circuit {
    * Expected JSON: an array of points or an object containing an array of points.
    */
   positionsUrl?: string
+  /** Label in `sector_positions.csv` for start/finish + sector boundaries (if present). */
+  sectorCsvTrack?: string
+  /** Restrict lap-year dropdown; default = all years in CSV for this race. */
+  lapUiYearAllowlist?: readonly number[]
+  /** Restrict speed chart x-axis years; default = derived from telemetry CSV. */
+  speedChartYearAllowlist?: readonly number[]
+  /** Optional note under lap-time charts (e.g. rain-affected race). */
+  lapChartFootnote?: string
+  /** Optional note under Speed / Overtake charts. */
+  chartFootnote?: string
+  /** Use `drs_telemetry_data_miami.csv` for Overtake map coloring (Miami). */
+  useMiamiDrsTelemetry?: boolean
 }

@@ -1,5 +1,5 @@
 # Regenerate dashboard CSVs from FastF1 and commit to the repo.
-# After push: run `npm run deploy` (or your Firebase workflow) to publish updated data.
+# Pushing updated CSVs to main triggers "Deploy Firebase Hosting" automatically.
 #
 # Manual run: GitHub → Actions → "Refresh F1 data (FastF1)" → Run workflow
 
@@ -22,7 +22,7 @@ permissions:
 jobs:
   refresh-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     steps:
       - name: Checkout repository
@@ -61,10 +61,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/data/speed_metrics_final.csv \
                   public/data/fastest_laps_telemetry.csv \
-                  public/data/drs_telemetry_data_miami.csv
+                  public/data/drs_telemetry_data_miami.csv \
+                  public/data/overtake_data.csv
           if git diff --staged --quiet; then
             echo "No data file changes to commit."
             exit 0
           fi
-          git commit -m "chore(data): refresh CSVs from FastF1 [skip ci]"
+          git commit -m "chore(data): refresh CSVs from FastF1"
           git push

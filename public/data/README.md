@@ -1,6 +1,8 @@
 Put data files here so the dashboard can fetch them at runtime.
 
-To regenerate lap/telemetry CSVs from FastF1 via GitHub Actions, see [docs/DATA_REFRESH.md](../../docs/DATA_REFRESH.md).
+To regenerate CSVs from FastF1 (notebook logic, full calendar), see [docs/DATA_REFRESH.md](../../docs/DATA_REFRESH.md).
+
+**Overtake chart:** edit `overtake_counts_source.csv` (manual overtake totals); the collector merges it with position changes from lap data into `overtake_data.csv`.
 
 ## Lap times CSV
 

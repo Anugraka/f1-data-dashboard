@@ -1,4 +1,4 @@
-import { ENGINE_COLORS } from './circuits'
+import { ENGINE_COLORS } from './engineColors'
 import type { EngineManufacturer, TeamLap, YearBestTeamLap } from '../types'
 
 export type SectorKey = 'LapTime' | 'Sector1Time' | 'Sector2Time' | 'Sector3Time'
@@ -224,32 +224,25 @@ export function yearsForRace(rows: LapTimesRow[], race: string): string[] {
   return Array.from(set).sort((a, b) => Number(a) - Number(b))
 }
 
-/**
- * Lap chart seasons shown in the UI: intersect CSV years with per-circuit allowlists (tracks where
- * we only want a subset of seasons in the dropdown).
- */
-const LAP_UI_YEAR_ALLOWLIST: Record<string, readonly number[]> = {
-  shanghai: [2024, 2025, 2026],
-  miami: [2022, 2023, 2024, 2025, 2026],
-}
-
-function allowedYearsSetForCircuit(circuitId: string): Set<number> | null {
-  const list = LAP_UI_YEAR_ALLOWLIST[circuitId]
-  if (!list?.length) return null
-  return new Set(list)
-}
-
-/** Like {@link yearsForRace}, but restricted to the circuit’s UI allowlist when defined. */
-export function yearsForRaceUi(rows: LapTimesRow[], race: string, circuitId: string): string[] {
+/** Like {@link yearsForRace}, but restricted to `lapUiYearAllowlist` on the circuit when set. */
+export function yearsForRaceUi(
+  rows: LapTimesRow[],
+  race: string,
+  lapUiYearAllowlist?: readonly number[],
+): string[] {
   const raw = yearsForRace(rows, race)
-  const allow = allowedYearsSetForCircuit(circuitId)
-  if (!allow) return raw
+  if (!lapUiYearAllowlist?.length) return raw
+  const allow = new Set(lapUiYearAllowlist)
   return raw.filter((y) => allow.has(Number(y))).sort((a, b) => Number(a) - Number(b))
 }
 
 /** Latest CSV year for this race that is allowed in the UI for this circuit. */
-export function latestYearForRaceUi(rows: LapTimesRow[], race: string, circuitId: string): string | undefined {
-  const ys = yearsForRaceUi(rows, race, circuitId)
+export function latestYearForRaceUi(
+  rows: LapTimesRow[],
+  race: string,
+  lapUiYearAllowlist?: readonly number[],
+): string | undefined {
+  const ys = yearsForRaceUi(rows, race, lapUiYearAllowlist)
   if (ys.length === 0) return undefined
   return ys[ys.length - 1]
 }
