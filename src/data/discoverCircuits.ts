@@ -6,6 +6,7 @@ import {
   catalogEntryToCircuit,
   thumbSectorsForCatalogEntry,
 } from './circuitCatalog'
+import { compareCircuitsBy2026Calendar } from './raceOrder2026'
 import { buildThumbSectorsFromTelemetry } from './buildThumbSectors'
 import type { Circuit } from '../types'
 import { latestYearForTrack, pickDriverWithMostPoints } from './telemetry'
@@ -79,5 +80,5 @@ export function discoverCircuitsFromData(
     circuits.push(catalogEntryToCircuit(entry, thumb.length ? thumb : undefined))
   }
 
-  return circuits.sort((a, b) => a.name.localeCompare(b.name))
+  return circuits.sort(compareCircuitsBy2026Calendar)
 }

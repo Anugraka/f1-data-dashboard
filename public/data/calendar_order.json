@@ -1,0 +1,28 @@
+{
+  "2026": [
+    {
+      "round": 1,
+      "race": "Australian Grand Prix"
+    },
+    {
+      "round": 2,
+      "race": "Chinese Grand Prix"
+    },
+    {
+      "round": 3,
+      "race": "Japanese Grand Prix"
+    },
+    {
+      "round": 4,
+      "race": "Bahrain Grand Prix"
+    },
+    {
+      "round": 5,
+      "race": "Saudi Arabian Grand Prix"
+    },
+    {
+      "round": 6,
+      "race": "Miami Grand Prix"
+    }
+  ]
+}

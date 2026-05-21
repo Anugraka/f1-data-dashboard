@@ -2,7 +2,7 @@
 
 The dashboard reads static CSVs from `public/data/`. The collector script mirrors **Data_Collection.ipynb** but loops over **every race** on the FastF1 calendar for each year (not only the four sidebar circuits).
 
-**Sidebar tracks** are discovered automatically: any race that has rows in both `speed_metrics_final.csv` and `fastest_laps_telemetry.csv` gets a sidebar tab with Lap Time, Speed, and Overtake modes. Known GPs (Australia, Shanghai, Japan, Miami) use hand-tuned labels, thumbs, and footnotes via `src/data/circuitCatalog.ts`; new GPs get defaults (auto-generated thumb from telemetry). Add catalog entries when you want custom labels or year filters.
+**Sidebar tracks** are discovered automatically: any race that has rows in both `speed_metrics_final.csv` and `fastest_laps_telemetry.csv` gets a sidebar tab with Lap Time, Speed, and Overtake modes. **Order** follows the 2026 calendar in `src/data/raceOrder2026.ts` (must match CSV `Race` / FastF1 `EventName`). Known GPs use hand-tuned labels, thumbs, and footnotes via `src/data/circuitCatalog.ts`; new GPs get defaults (auto-generated thumb from telemetry).
 
 ## What it updates
 
