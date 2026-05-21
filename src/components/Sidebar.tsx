@@ -90,9 +90,10 @@ export function Sidebar({ circuits, selectedId, isHome, onHome, onSelectCircuit 
             </button>
           )
         })}
-        <p className="mt-2 border-t border-zinc-100 px-1 pt-3 pb-1 text-[11px] leading-snug text-zinc-500">
-          All data was collected from the FastF1 API and the official Formula 1 website.
-        </p>
+        <div className="mt-2 space-y-2 border-t border-zinc-100 px-1 pt-3 pb-1 text-[11px] leading-snug text-zinc-500">
+          <p>All data was collected from the FastF1 API and the official Formula 1 website.</p>
+          <p>The dashboard updates every Monday at 6:00 UTC.</p>
+        </div>
       </nav>
     </aside>
   )
