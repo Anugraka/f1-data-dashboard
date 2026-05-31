@@ -65,12 +65,6 @@ type Props = {
   /** Loaded once in App; null = still loading */
   telemetry: TelemetryPoint[] | null
   telemetryError: string | null
-  /**
-   * Miami only: `drs_telemetry_data_miami.csv` for Overtake-mode DRS coloring (main fastest-lap CSV has no DRS variation).
-   * null = loading; [] after failed load (see `miamiDrsTelemetryError`).
-   */
-  miamiDrsTelemetry: TelemetryPoint[] | null
-  miamiDrsTelemetryError: string | null
   /** From `sector_positions.csv`; null while loading */
   sectorPositionsMap: Map<string, SectorBoundaries> | null
 }
@@ -259,8 +253,6 @@ export function CircuitMapCard({
   onSectorChange,
   telemetry,
   telemetryError,
-  miamiDrsTelemetry,
-  miamiDrsTelemetryError,
   sectorPositionsMap,
 }: Props) {
   const viewId = useId()
@@ -316,35 +308,11 @@ export function CircuitMapCard({
     return driver ? filtered.filter((p) => p.driver === driver) : filtered
   }, [circuit.fastF1RaceName, circuit.name, mode, telemetry])
 
-  const useMiamiDrsMap = Boolean(circuit.useMiamiDrsTelemetry) && mode === 'Overtake'
-
-  /**
-   * Lap used for DRS segment coloring: Miami Overtake uses `miamiDrsTelemetry`; otherwise the filtered fastest-lap row set.
-   */
+  /** Fastest-lap telemetry used for Overtake-mode DRS segment coloring (`fastest_laps_telemetry.csv`). */
   const drsLapPoints = useMemo(() => {
     if (mode !== 'Overtake') return null
-    const track = (circuit.fastF1RaceName ?? circuit.name).trim()
-    if (useMiamiDrsMap) {
-      if (miamiDrsTelemetry === null) return null
-      if (miamiDrsTelemetry.length === 0) return []
-      const latest = latestYearForTrack(miamiDrsTelemetry, track)
-      const year = pickYearForDrsVisualization(miamiDrsTelemetry, track) ?? latest
-      const filtered = miamiDrsTelemetry.filter(
-        (p) => (p.track ?? '').trim() === track && (!year || p.year === year),
-      )
-      if (filtered.length === 0) return []
-      const driver = pickDriverWithMostPoints(filtered)
-      return driver ? filtered.filter((p) => p.driver === driver) : filtered
-    }
     return telemetryForCircuit ?? null
-  }, [
-    circuit.fastF1RaceName,
-    circuit.name,
-    mode,
-    miamiDrsTelemetry,
-    telemetryForCircuit,
-    useMiamiDrsMap,
-  ])
+  }, [mode, telemetryForCircuit])
 
   const telemetryPath = useMemo(() => {
     if (!telemetryForCircuit || telemetryForCircuit.length < 2) {
@@ -366,28 +334,6 @@ export function CircuitMapCard({
       transform: tr,
     }
   }, [telemetryForCircuit])
-
-  /** View box for DRS segments (Miami Overtake follows `drs_telemetry_data_miami.csv` geometry). */
-  const drsTelemetryPath = useMemo(() => {
-    if (!drsLapPoints || drsLapPoints.length < 2) {
-      return { points: [] as TrackPoint[], min: 0, max: 0, transform: null as ViewBoxTransform | null }
-    }
-    const raw = drsLapPoints.map((p) => ({ x: p.x, y: p.y }))
-    const tr = getViewBoxTransform(raw, 400, 260, 18)
-    const normalized = raw.map((p) => projectXYToViewBox(p.x, p.y, tr))
-    let min = Infinity
-    let max = -Infinity
-    for (const p of drsLapPoints) {
-      if (p.speed < min) min = p.speed
-      if (p.speed > max) max = p.speed
-    }
-    return {
-      points: normalized,
-      min: Number.isFinite(min) ? min : 0,
-      max: Number.isFinite(max) ? max : 0,
-      transform: tr,
-    }
-  }, [drsLapPoints])
 
   const apiPath = useMemo(() => {
     if (!apiPoints || apiPoints.length < 2) return ''
@@ -415,7 +361,7 @@ export function CircuitMapCard({
   const drsSegments = useMemo(() => {
     if (mode !== 'Overtake') return []
     if (!drsLapPoints || drsLapPoints.length < 2) return []
-    const { points } = useMiamiDrsMap ? drsTelemetryPath : telemetryPath
+    const { points } = telemetryPath
     if (points.length < 2) return []
     const segs: Array<{ d: string; color: string }> = []
     for (let i = 1; i < points.length; i++) {
@@ -427,7 +373,7 @@ export function CircuitMapCard({
       segs.push({ d: `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} L ${b.x.toFixed(2)} ${b.y.toFixed(2)}`, color })
     }
     return segs
-  }, [drsLapPoints, drsTelemetryPath, mode, telemetryPath, useMiamiDrsMap])
+  }, [drsLapPoints, mode, telemetryPath])
 
   const sectorPositionsForCircuit = useMemo(() => {
     if (!sectorPositionsMap) return null
@@ -455,25 +401,15 @@ export function CircuitMapCard({
     return buildEqualDistanceThirdsAnchoredAtSF(pts, cumM, lapLen, lapSectorAnchorK)
   }, [telemetryPath.points, telemetryForCircuit, lapSectorAnchorK])
 
-  const lapSectorAnchorKForStartFinish = useMemo(() => {
-    if (useMiamiDrsMap && drsLapPoints && drsLapPoints.length >= 2) {
-      const raw = drsLapPoints.map((p) => ({ x: p.x, y: p.y }))
-      const sf = sectorPositionsForCircuit?.startFinish
-      if (sf) return closestVertexIndex(raw, sf.x, sf.y)
-      return 0
-    }
-    return lapSectorAnchorK
-  }, [drsLapPoints, lapSectorAnchorK, sectorPositionsForCircuit?.startFinish, useMiamiDrsMap])
-
   const startFinishMark = useMemo(() => {
-    const path = useMiamiDrsMap ? drsTelemetryPath : telemetryPath
+    const path = telemetryPath
     if (!path.transform || !sectorPositionsForCircuit?.startFinish || path.points.length < 2) {
       return null
     }
     const pts = path.points
     const { x, y } = sectorPositionsForCircuit.startFinish
     const p = projectXYToViewBox(x, y, path.transform)
-    const k = lapSectorAnchorKForStartFinish
+    const k = lapSectorAnchorK
     const n = pts.length
     let tdx: number
     let tdy: number
@@ -501,13 +437,10 @@ export function CircuitMapCard({
     }
   }, [
     circuit.id,
-    drsTelemetryPath.points,
-    drsTelemetryPath.transform,
-    lapSectorAnchorKForStartFinish,
+    lapSectorAnchorK,
     sectorPositionsForCircuit,
     telemetryPath.points,
     telemetryPath.transform,
-    useMiamiDrsMap,
   ])
 
   /** API layout only (no telemetry polyline): direction from centerline samples + sector CSV start/finish. */
@@ -720,21 +653,10 @@ export function CircuitMapCard({
             Loading telemetry…
           </div>
         ) : null}
-        {useMiamiDrsMap && miamiDrsTelemetry === null && !miamiDrsTelemetryError ? (
-          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">
-            Loading Miami DRS telemetry…
-          </div>
-        ) : null}
         {(mode === 'Speed' || mode === 'Overtake') && telemetryError ? (
           <div className="mx-auto mt-3 max-w-xl rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">
             Couldn’t load telemetry CSV (<code className="font-mono">/data/fastest_laps_telemetry.csv</code>):{' '}
             {telemetryError}
-          </div>
-        ) : null}
-        {useMiamiDrsMap && miamiDrsTelemetryError ? (
-          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">
-            Couldn’t load Miami DRS CSV (<code className="font-mono">/data/drs_telemetry_data_miami.csv</code>):{' '}
-            {miamiDrsTelemetryError}
           </div>
         ) : null}
         {(mode === 'Speed' || mode === 'Overtake') && telemetry !== null && telemetry.length === 0 && !telemetryError ? (
@@ -746,19 +668,9 @@ export function CircuitMapCard({
         telemetry !== null &&
         telemetry.length > 0 &&
         telemetryForCircuit &&
-        telemetryForCircuit.length === 0 &&
-        !(useMiamiDrsMap && Array.isArray(miamiDrsTelemetry) && miamiDrsTelemetry.length > 0) ? (
+        telemetryForCircuit.length === 0 ? (
           <div className="mx-auto mt-3 max-w-xl rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">
             No telemetry found for <span className="font-semibold">{circuit.fastF1RaceName ?? circuit.name}</span>.
-          </div>
-        ) : null}
-        {useMiamiDrsMap &&
-        miamiDrsTelemetry !== null &&
-        !miamiDrsTelemetryError &&
-        drsLapPoints &&
-        drsLapPoints.length === 0 ? (
-          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">
-            No Miami DRS telemetry rows matched <span className="font-semibold">{circuit.fastF1RaceName ?? circuit.name}</span>.
           </div>
         ) : null}
         {!apiPath && !circuit.trackSegments?.length && mode !== 'Speed' && mode !== 'Overtake' && !lapSectorPaths.length ? (

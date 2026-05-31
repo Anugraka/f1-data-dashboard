@@ -20,8 +20,6 @@ export type CircuitCatalogEntry = {
   lapChartFootnote?: string
   /** Shown under Speed and Overtake charts (e.g. Shanghai cancellation note). */
   chartFootnote?: string
-  /** Miami Overtake map uses dedicated DRS telemetry CSV when true. */
-  useMiamiDrsTelemetry?: boolean
 }
 
 /** Known circuits with rich metadata; unknown GPs get defaults from {@link defaultCatalogEntry}. */
@@ -69,7 +67,6 @@ export const CIRCUIT_CATALOG: CircuitCatalogEntry[] = [
     country: 'United States',
     sectorCsvTrack: 'Miami',
     positionsUrlSlug: 'miami',
-    useMiamiDrsTelemetry: true,
   },
 ]
 
@@ -132,6 +129,5 @@ export function catalogEntryToCircuit(
     speedChartYearAllowlist: entry.speedChartYearAllowlist,
     lapChartFootnote: entry.lapChartFootnote,
     chartFootnote: entry.chartFootnote,
-    useMiamiDrsTelemetry: entry.useMiamiDrsTelemetry,
   }
 }

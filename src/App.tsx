@@ -17,7 +17,6 @@ import {
 } from './data/laptimes'
 import { loadSectorPositionsCsv, type SectorBoundaries } from './data/sectorPositions'
 import {
-  loadDrsTelemetryMiamiCsv,
   loadFastestLapsTelemetryCsv,
   speedBoxPlotSeriesForTrack,
   type SpeedSectorScope,
@@ -48,8 +47,6 @@ function App() {
   const [lapRowsError, setLapRowsError] = useState<string | null>(null)
   const [telemetryRows, setTelemetryRows] = useState<TelemetryPoint[] | null>(null)
   const [telemetryError, setTelemetryError] = useState<string | null>(null)
-  const [miamiDrsRows, setMiamiDrsRows] = useState<TelemetryPoint[] | null>(null)
-  const [miamiDrsError, setMiamiDrsError] = useState<string | null>(null)
   const [overtakeRows, setOvertakeRows] = useState<Awaited<ReturnType<typeof loadOvertakeDataCsv>> | null>(null)
   const [overtakeError, setOvertakeError] = useState<string | null>(null)
   const [sectorPositionsMap, setSectorPositionsMap] = useState<Map<string, SectorBoundaries> | null>(null)
@@ -154,27 +151,6 @@ function App() {
     let cancelled = false
     async function load() {
       try {
-        setMiamiDrsError(null)
-        setMiamiDrsRows(null)
-        const rows = await loadDrsTelemetryMiamiCsv('/data/drs_telemetry_data_miami.csv')
-        if (!cancelled) setMiamiDrsRows(rows)
-      } catch (e) {
-        if (!cancelled) {
-          setMiamiDrsError(e instanceof Error ? e.message : 'Failed to load Miami DRS telemetry CSV.')
-          setMiamiDrsRows([])
-        }
-      }
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
         const m = await loadSectorPositionsCsv('/data/sector_positions.csv')
         if (!cancelled) setSectorPositionsMap(m)
       } catch {
@@ -249,8 +225,20 @@ function App() {
 
   const overtakesForCircuit = useMemo(() => {
     if (!raceName || overtakeRows === null) return []
-    return overtakesForRace(overtakeRows, raceName)
+    return overtakesForRace(overtakeRows, raceName).filter(
+      (r) => Number.isFinite(r.overtakes) && r.overtakes >= 0,
+    )
   }, [overtakeRows, raceName])
+
+  const overtakeEmptyMessage = useMemo(() => {
+    if (!raceName || overtakeRows === null || overtakeError) return undefined
+    const stem = raceName.replace(/\s+Grand Prix$/i, '').trim() || raceName
+    return (
+      `Overtake counts for the ${stem} Grand Prix are not available yet. ` +
+      'Add rows to public/data/overtake_counts_source.csv (Race, Year, Overtakes) after the race, ' +
+      'then run the data refresh workflow.'
+    )
+  }, [overtakeError, overtakeRows, raceName])
 
   const telemetryLoading = telemetryRows === null && !telemetryError
   const overtakeLoading = overtakeRows === null && !overtakeError
@@ -354,8 +342,6 @@ function App() {
                 onSectorChange={setSector}
                 telemetry={telemetryRows}
                 telemetryError={telemetryError}
-                miamiDrsTelemetry={miamiDrsRows}
-                miamiDrsTelemetryError={miamiDrsError}
                 sectorPositionsMap={sectorPositionsMap}
               />
               {mode === 'Speed' ? (
@@ -373,6 +359,7 @@ function App() {
                   data={overtakesForCircuit}
                   loading={overtakeLoading}
                   error={overtakeError}
+                  emptyMessage={overtakeEmptyMessage}
                   footnote={chartFootnote}
                 />
               ) : lapRowsError ? (

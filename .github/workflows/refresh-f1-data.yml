@@ -70,7 +70,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/data/speed_metrics_final.csv \
                   public/data/fastest_laps_telemetry.csv \
-                  public/data/drs_telemetry_data_miami.csv \
                   public/data/overtake_data.csv
           if git diff --staged --quiet; then
             echo "No data file changes to commit."

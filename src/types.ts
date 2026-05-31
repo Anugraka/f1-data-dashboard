@@ -58,6 +58,4 @@ export interface Circuit {
   lapChartFootnote?: string
   /** Optional note under Speed / Overtake charts. */
   chartFootnote?: string
-  /** Use `drs_telemetry_data_miami.csv` for Overtake map coloring (Miami). */
-  useMiamiDrsTelemetry?: boolean
 }

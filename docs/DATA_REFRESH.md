@@ -10,8 +10,7 @@ The dashboard reads static CSVs from `public/data/`. The collector script mirror
 |------|--------|
 | `speed_metrics_final.csv` | All race laps + per-year engine mapping (notebook) |
 | `fastest_laps_telemetry.csv` | Fastest lap telemetry, DRS mapped with `drs_mapping` |
-| `drs_telemetry_data_miami.csv` | Miami rows from telemetry (dashboard Overtake map) |
-| `overtake_data.csv` | `overtake_counts_source.csv` + position-change counts from laps |
+| `overtake_data.csv` | `overtake_counts_source.csv` + position-change counts from laps (optional; missing rows are logged, not fatal) |
 
 **Not updated:** `sector_positions.csv`, `miami_2026.csv` (edit manually if needed).
 
@@ -80,4 +79,4 @@ Cache: `.fastf1-cache/` (gitignored).
 - **`RateLimitExceededError: any API: 500 calls/h`:** Too many sessions in one job. Use `--weekly` or `--events "One Grand Prix"` per run. Re-run after ~1 hour.
 - **Failed event / year:** Session may not exist yet (future rounds). Re-run with a smaller `--years` list after the race.
 - **Huge CSV / slow CI:** Use `--max-telemetry-points 1500` in the workflow command if needed.
-- **Overtake chart empty for a circuit:** Add that GP to `overtake_counts_source.csv`.
+- **Overtake chart empty for a circuit:** Add that GP to `overtake_counts_source.csv` (Race, Year, Overtakes). The dashboard shows a message instead of an error; the refresh job still succeeds.

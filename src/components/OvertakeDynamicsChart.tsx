@@ -6,6 +6,8 @@ type Props = {
   data: OvertakeSeasonRow[]
   loading?: boolean
   error?: string | null
+  /** Shown when there are no chart rows (e.g. manual counts not entered yet). */
+  emptyMessage?: string
   footnote?: string
 }
 
@@ -42,7 +44,14 @@ function viridisColor(t: number): string {
   return `rgb(${r} ${g} ${bl})`
 }
 
-export function OvertakeDynamicsChart({ title, data, loading, error, footnote }: Props) {
+export function OvertakeDynamicsChart({
+  title,
+  data,
+  loading,
+  error,
+  emptyMessage,
+  footnote,
+}: Props) {
   const hasAny = data.length > 0
 
   return (
@@ -60,7 +69,10 @@ export function OvertakeDynamicsChart({ title, data, loading, error, footnote }:
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : !hasAny ? (
-        <p className="text-sm text-zinc-500">No overtake rows for this circuit in the CSV.</p>
+        <p className="text-sm leading-relaxed text-zinc-600">
+          {emptyMessage ??
+            'No overtake rows for this circuit in the CSV. Add counts to public/data/overtake_counts_source.csv.'}
+        </p>
       ) : (
         <OvertakeDynamicsSvg data={data} />
       )}

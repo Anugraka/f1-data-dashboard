@@ -9,8 +9,7 @@ Collect dashboard CSVs using the same logic as Data_Collection.ipynb.
 Outputs (default public/data):
   speed_metrics_final.csv
   fastest_laps_telemetry.csv
-  drs_telemetry_data_miami.csv  (Miami rows from telemetry; used by Overtake map)
-  overtake_data.csv             (only if --overtake-source exists)
+  overtake_data.csv             (manual counts + lap position changes; never fails the job)
 """
 
 from __future__ import annotations
@@ -419,8 +418,11 @@ def normalize_race_name_in_overtake_source(df: pd.DataFrame) -> pd.DataFrame:
 def build_overtake_data(
     lap_df: pd.DataFrame,
     overtake_source_path: Path,
-) -> pd.DataFrame:
-    """Notebook: position changes from laps + merge manual Overtakes counts."""
+) -> pd.DataFrame | None:
+    """
+    Position changes from laps + optional manual Overtakes from overtake_counts_source.csv.
+    Never raises: missing manual rows are left empty with a log note.
+    """
     position_changes = (
         lap_df.groupby(["Race", "Year"])["Position"]
         .apply(lambda x: (x.diff().abs() > 0).sum())
@@ -428,14 +430,51 @@ def build_overtake_data(
     )
     position_changes.rename(columns={"Position": "Number of Position Changes"}, inplace=True)
 
-    overtakes = pd.read_csv(overtake_source_path)
+    if not overtake_source_path.is_file():
+        print(
+            f"Note: overtake source not found ({overtake_source_path}); "
+            "skipping overtake_data.csv update.",
+        )
+        return None
+
+    try:
+        overtakes = pd.read_csv(overtake_source_path)
+    except Exception as exc:
+        print(f"Note: could not read overtake source ({exc}); skipping overtake_data.csv.", file=sys.stderr)
+        return None
+
     if "Overtakes" not in overtakes.columns:
-        raise ValueError(f"{overtake_source_path} must include an Overtakes column")
+        print(
+            f"Note: {overtake_source_path} has no Overtakes column; skipping overtake_data.csv.",
+            file=sys.stderr,
+        )
+        return None
+
+    if "Year" not in overtakes.columns:
+        print(f"Note: {overtake_source_path} has no Year column; skipping overtake_data.csv.", file=sys.stderr)
+        return None
 
     overtakes = normalize_race_name_in_overtake_source(overtakes)
     merged = pd.merge(overtakes, position_changes, on=["Race", "Year"], how="left")
+
+    missing_pc = merged["Number of Position Changes"].isna()
+    if missing_pc.any():
+        for _, row in merged.loc[missing_pc].iterrows():
+            print(
+                f"  note: no lap data for manual overtake row {row['Race']} {row['Year']}",
+            )
+
+    missing_ot = merged["Overtakes"].isna()
+    if missing_ot.any():
+        for _, row in merged.loc[missing_ot].iterrows():
+            print(
+                f"  note: missing Overtakes value for {row['Race']} {row['Year']} "
+                f"in {overtake_source_path.name}",
+            )
+
+    denom = merged["Number of Position Changes"].replace(0, pd.NA)
     merged["% of Position Changes from Overtakes"] = (
-        merged["Overtakes"] / merged["Number of Position Changes"]
+        merged["Overtakes"] / denom
     ) * 100
     return merged
 
@@ -589,27 +628,24 @@ def collect(
         tel_df.to_csv(tel_path, index=False)
         print(f"Wrote {tel_path} ({len(tel_df)} rows)")
 
-        miami_df = tel_df[tel_df["Track"] == MIAMI_GP]
-        if not miami_df.empty:
-            miami_path = out_dir / "drs_telemetry_data_miami.csv"
-            miami_df.to_csv(miami_path, index=False)
-            print(f"Wrote {miami_path} ({len(miami_df)} rows)")
-
-    if overtake_source and overtake_source.is_file():
-        if not lap_df.empty:
-            overtake_df = build_overtake_data(lap_df, overtake_source)
+    if not lap_df.empty and overtake_source is not None:
+        overtake_df = build_overtake_data(lap_df, overtake_source)
+        if overtake_df is not None and not overtake_df.empty:
             overtake_path = out_dir / "overtake_data.csv"
             overtake_df.to_csv(overtake_path, index=False)
             print(f"Wrote {overtake_path} ({len(overtake_df)} rows)")
-        else:
-            print("Skipping overtake_data.csv (no lap data).", file=sys.stderr)
-    else:
+
+    if lap_df.empty:
+        return 1
+    if errors == 0:
+        return 0
+    if events_filter is not None and fetched > 0:
         print(
-            f"Skipping overtake_data.csv (source not found: {overtake_source}).",
+            f"Finished with {errors} session error(s); lap/telemetry CSVs were still updated.",
             file=sys.stderr,
         )
-
-    return 0 if errors == 0 else 1
+        return 0
+    return 1
 
 
 def main() -> int:
