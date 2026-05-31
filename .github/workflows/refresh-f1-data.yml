@@ -9,7 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       years:
-        description: "Comma-separated years (e.g. 2025,2026). Leave empty for all configured years."
+        description: "Comma-separated years (default 2022–2026). Used with --events or full refresh."
+        required: false
+        default: ""
+      events:
+        description: "Optional GP names, e.g. Monaco Grand Prix — refreshes that track for all years."
         required: false
         default: ""
   schedule:
@@ -47,12 +51,17 @@ jobs:
       - name: Collect data from FastF1
         env:
           YEARS_INPUT: ${{ github.event.inputs.years }}
+          EVENTS_INPUT: ${{ github.event.inputs.events }}
         run: |
           set -e
-          if [ -n "$YEARS_INPUT" ]; then
-            python scripts/collect_fastf1_data.py --years "$YEARS_INPUT"
+          YEARS="${YEARS_INPUT:-2022,2023,2024,2025,2026}"
+          ARGS="--years $YEARS --session-delay 6 --rate-limit-retries 2"
+          if [ -n "$EVENTS_INPUT" ]; then
+            python scripts/collect_fastf1_data.py $ARGS --events "$EVENTS_INPUT"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            python scripts/collect_fastf1_data.py $ARGS --weekly
           else
-            python scripts/collect_fastf1_data.py
+            python scripts/collect_fastf1_data.py $ARGS --weekly
           fi
 
       - name: Commit and push updated CSVs

@@ -30,7 +30,21 @@ Columns: `Race`, `Year`, `Overtakes` — `Race` may be short (`Australia`) or fu
 3. Optional **years**: e.g. `2025,2026` (faster than all seasons).
 4. Commits to `main` trigger **Deploy Firebase Hosting** (needs `FIREBASE_TOKEN` secret — see below).
 
-Schedule: **Mondays 06:00 UTC**. Job timeout: **3 hours** (full calendar is slow).
+Schedule: **Mondays 06:00 UTC**. Scheduled runs use **`--weekly`**:
+
+1. Detect which **2026 GP** just finished (FastF1 schedule, last 8 days UTC).
+2. **Merge** into existing `speed_metrics_final.csv` / telemetry — no full re-download of every season.
+3. For that circuit only, fetch **2022–2026** (skips China 2022–2023).
+
+~5 sessions per week → stays under FastF1’s **500 API calls/hour** limit while keeping all years on disk.
+
+**Optional calendar:** `public/data/race_weekends_2026.csv` — fill `WeekendEnd` (YYYY-MM-DD) if you want a manual fallback when schedule detection finds nothing.
+
+**First-time / missing tracks:** run manually with **events** set to one GP at a time, e.g. `Monaco Grand Prix` (workflow input or `--events "Monaco Grand Prix"`). Repeat per circuit until the repo has full history. **Full calendar in one job** still risks rate limits.
+
+**Manual weekly override:** Actions → **events** = `Miami Grand Prix` to force-refresh that track for all years.
+
+Job timeout: **3 hours**.
 
 ## One-time setup: `FIREBASE_TOKEN`
 
@@ -41,8 +55,10 @@ Schedule: **Mondays 06:00 UTC**. Job timeout: **3 hours** (full calendar is slow
 
 ```bash
 pip install -r scripts/requirements-data.txt
-python scripts/collect_fastf1_data.py
-python scripts/collect_fastf1_data.py --years 2025,2026
+# Weekly-style (matches GitHub schedule)
+python scripts/collect_fastf1_data.py --weekly --years 2022,2023,2024,2025,2026 --session-delay 6
+# One circuit, all years (bootstrap a new sidebar track)
+python scripts/collect_fastf1_data.py --events "Monaco Grand Prix" --years 2022,2023,2024,2025,2026 --session-delay 6
 # Optional: cap telemetry size for a quicker test run
 python scripts/collect_fastf1_data.py --max-telemetry-points 1500
 ```
@@ -61,6 +77,7 @@ Cache: `.fastf1-cache/` (gitignored).
 
 ## Troubleshooting
 
+- **`RateLimitExceededError: any API: 500 calls/h`:** Too many sessions in one job. Use `--weekly` or `--events "One Grand Prix"` per run. Re-run after ~1 hour.
 - **Failed event / year:** Session may not exist yet (future rounds). Re-run with a smaller `--years` list after the race.
 - **Huge CSV / slow CI:** Use `--max-telemetry-points 1500` in the workflow command if needed.
 - **Overtake chart empty for a circuit:** Add that GP to `overtake_counts_source.csv`.
