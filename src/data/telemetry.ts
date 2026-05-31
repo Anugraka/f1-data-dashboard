@@ -1,3 +1,4 @@
+import { racesMatch } from './raceNameCanonical'
 import {
   cumulativeDistancesM,
   distanceFromAnchorVertex,
@@ -124,7 +125,7 @@ export function latestYearForTrack(points: TelemetryPoint[], track: string) {
   const t = track.trim()
   let best: number | null = null
   for (const p of points) {
-    if ((p.track ?? '').trim() !== t) continue
+    if (!racesMatch(p.track ?? '', t)) continue
     const y = Number((p.year ?? '').trim())
     if (!Number.isFinite(y)) continue
     if (best == null || y > best) best = y
@@ -141,14 +142,14 @@ export function pickYearForDrsVisualization(points: TelemetryPoint[], trackName:
   const t = trackName.trim()
   const years = new Set<number>()
   for (const p of points) {
-    if ((p.track ?? '').trim() !== t) continue
+    if (!racesMatch(p.track ?? '', t)) continue
     const y = Number((p.year ?? '').trim())
     if (Number.isFinite(y)) years.add(y)
   }
   const sortedDesc = [...years].sort((a, b) => b - a)
   for (const yNum of sortedDesc) {
     const yearStr = String(yNum)
-    const yearPoints = points.filter((p) => (p.track ?? '').trim() === t && p.year === yearStr)
+    const yearPoints = points.filter((p) => racesMatch(p.track ?? '', t) && p.year === yearStr)
     if (yearPoints.length === 0) continue
     const driver = pickDriverWithMostPoints(yearPoints)
     const lap = driver ? yearPoints.filter((p) => p.driver === driver) : yearPoints
@@ -253,7 +254,7 @@ export function topSpeedSeriesForTrack(
 ): { year: number; speedKmh: number | null }[] {
   return years.map((year) => {
     const yearPoints = allPoints.filter(
-      (p) => (p.track ?? '').trim() === trackName && Number((p.year ?? '').trim()) === year,
+      (p) => racesMatch(p.track ?? '', trackName) && Number((p.year ?? '').trim()) === year,
     )
     if (yearPoints.length === 0) {
       return { year, speedKmh: null }
@@ -298,7 +299,7 @@ export function speedBoxPlotSeriesForTrack(
 ): SpeedBoxPlotYearPoint[] {
   return years.map((year) => {
     const yearPoints = allPoints.filter(
-      (p) => (p.track ?? '').trim() === trackName && Number((p.year ?? '').trim()) === year,
+      (p) => racesMatch(p.track ?? '', trackName) && Number((p.year ?? '').trim()) === year,
     )
     if (yearPoints.length === 0) {
       return { year, minKmh: null, q1Kmh: null, medianKmh: null, q3Kmh: null, maxKmh: null, n: 0 }

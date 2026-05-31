@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import type { Circuit, TrackPoint } from '../types'
+import { racesMatch } from '../data/raceNameCanonical'
 import type { SectorBoundaries } from '../data/sectorPositions'
 import {
   closestVertexIndex,
@@ -301,7 +302,7 @@ export function CircuitMapCard({
         ? pickYearForDrsVisualization(telemetry, track) ?? latest
         : latest
     const filtered = telemetry.filter(
-      (p) => (p.track ?? '').trim() === track && (!year || p.year === year),
+      (p) => racesMatch(p.track ?? '', track) && (!year || p.year === year),
     )
     if (filtered.length === 0) return []
     const driver = pickDriverWithMostPoints(filtered)

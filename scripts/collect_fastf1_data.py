@@ -106,14 +106,34 @@ CHINESE_GP = "Chinese Grand Prix"
 
 DEFAULT_CALENDAR_CSV = Path("public/data/race_weekends_2026.csv")
 
-# Canonical dashboard name → other FastF1 spellings for the same GP.
+# Canonical CSV name → legacy FastF1 spellings (mapped on ingest; never written to CSV).
 EVENT_ALIASES: dict[str, list[str]] = {
+    "Canadian Grand Prix": ["Canadian Grand Prix", "Canada Grand Prix"],
     "Sao Paulo Grand Prix": ["São Paulo Grand Prix", "Sao Paulo Grand Prix"],
     "Barcelona-Catalunya Grand Prix": [
         "Barcelona-Catalunya Grand Prix",
         "Spanish Grand Prix",
     ],
+    "United States Grand Prix": [
+        "United States Grand Prix",
+        "USA Grand Prix",
+        "U.S. Grand Prix",
+    ],
+    "Mexico City Grand Prix": ["Mexico City Grand Prix", "Mexican Grand Prix"],
 }
+
+
+def canonical_race_name(name: str) -> str:
+    """Single CSV/sidebar label per GP across seasons."""
+    n = str(name).strip()
+    if not n:
+        return n
+    key = _normalize_event_key(n)
+    for canonical, aliases in EVENT_ALIASES.items():
+        for candidate in [canonical, *aliases]:
+            if _normalize_event_key(candidate) == key:
+                return canonical
+    return n
 
 TEL_COLUMNS = ["Track", "Year", "Driver", "X", "Y", "Speed", "DRS"]
 
@@ -177,10 +197,23 @@ def events_from_calendar_csv(
     return found
 
 
+def _race_date_from_schedule_row(row: pd.Series) -> date | None:
+    """Prefer race-day session date over weekend start."""
+    for col in ("Session5Date", "Session4Date", "EventDate"):
+        val = row.get(col)
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            continue
+        try:
+            return pd.Timestamp(val).date()
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def events_from_fastf1_2026_schedule(today: date, lookback_days: int) -> list[str]:
-    """Use the 2026 championship schedule to see which GP weekend just finished."""
+    """GPs whose 2026 race day fell within the lookback window (UTC)."""
     start = today - timedelta(days=lookback_days)
-    found: list[str] = []
+    in_window: list[tuple[date, str]] = []
     try:
         schedule = fastf1.get_event_schedule(2026, include_testing=False)
     except Exception as exc:
@@ -194,16 +227,35 @@ def events_from_fastf1_2026_schedule(today: date, lookback_days: int) -> list[st
         name = str(row.get("EventName", "") or "").strip()
         if not name:
             continue
-        event_date = row.get("EventDate")
-        if event_date is None or (isinstance(event_date, float) and pd.isna(event_date)):
-            continue
-        try:
-            d = pd.Timestamp(event_date).date()
-        except (TypeError, ValueError):
+        d = _race_date_from_schedule_row(row)
+        if d is None:
             continue
         if start <= d <= today:
-            found.append(name)
-    return found
+            in_window.append((d, canonical_race_name(name)))
+
+    if in_window:
+        in_window.sort(key=lambda x: x[0])
+        latest_day = in_window[-1][0]
+        # All events on the most recent race day in the window (usually one GP).
+        names = [n for d, n in in_window if d == latest_day]
+        return list(dict.fromkeys(names))
+
+    # Fallback: latest 2026 round that has already occurred.
+    past: list[tuple[date, str]] = []
+    for _, row in schedule.iterrows():
+        name = str(row.get("EventName", "") or "").strip()
+        if not name:
+            continue
+        d = _race_date_from_schedule_row(row)
+        if d is not None and d <= today:
+            past.append((d, canonical_race_name(name)))
+    if past:
+        past.sort(key=lambda x: x[0])
+        print(
+            f"No GP in last {lookback_days}d; using latest completed 2026 round: {past[-1][1]} ({past[-1][0]})",
+        )
+        return [past[-1][1]]
+    return []
 
 
 def detect_weekly_events_to_refresh(
@@ -341,7 +393,7 @@ def event_names_for_year(year: int) -> list[str]:
 def collect_lap_times_from_session(
     session,
     year: int,
-    event_name: str,
+    race_label: str,
     team_engine: dict[str, str],
 ) -> pd.DataFrame | None:
     laptimes = session.laps
@@ -363,7 +415,7 @@ def collect_lap_times_from_session(
         ]
     ].copy()
 
-    speeds["Race"] = event_name
+    speeds["Race"] = race_label
     speeds["Year"] = year
     speeds["Engine"] = speeds["Team"].map(team_engine)
     return speeds
@@ -372,7 +424,7 @@ def collect_lap_times_from_session(
 def collect_fastest_lap_telemetry_from_session(
     session,
     year: int,
-    event_name: str,
+    race_label: str,
     max_points: int,
 ) -> pd.DataFrame | None:
     fastest_lap = session.laps.pick_fastest()
@@ -381,7 +433,7 @@ def collect_fastest_lap_telemetry_from_session(
 
     temp_df = pd.DataFrame(
         {
-            "Track": event_name,
+            "Track": race_label,
             "Year": year,
             "Driver": driver,
             "X": tel["X"],
@@ -479,10 +531,20 @@ def build_overtake_data(
     return merged
 
 
-def drop_race_year_rows(df: pd.DataFrame, race_col: str, event_name: str, year: int) -> pd.DataFrame:
+def drop_race_year_rows(
+    df: pd.DataFrame,
+    race_col: str,
+    canonical_name: str,
+    year: int,
+) -> pd.DataFrame:
     if df.empty or race_col not in df.columns or "Year" not in df.columns:
         return df
-    mask = (df[race_col].astype(str).str.strip() == event_name) & (df["Year"].astype(int) == year)
+    canon_key = _normalize_event_key(canonical_name)
+
+    def same_gp(label: object) -> bool:
+        return _normalize_event_key(canonical_race_name(str(label))) == canon_key
+
+    mask = df[race_col].map(same_gp) & (df["Year"].astype(int) == year)
     return df.loc[~mask].copy()
 
 
@@ -541,48 +603,48 @@ def collect(
     fetched = 0
     skipped = 0
 
-    def process_session(year: int, event_name: str) -> None:
+    def process_session(year: int, fastf1_event: str, csv_race_name: str) -> None:
         nonlocal lap_df, tel_df, lap_keys, tel_keys, errors, fetched, skipped
 
-        if skip_chinese_gp(year, event_name):
-            print(f"  skip {event_name} {year} (cancelled 2022–2023)")
+        if skip_chinese_gp(year, fastf1_event):
+            print(f"  skip {fastf1_event} {year} (cancelled 2022–2023)")
             skipped += 1
             return
 
         if incremental and events_filter is None and should_skip_incremental(
-            year, event_name, lap_keys, tel_keys, freshness_year
+            year, csv_race_name, lap_keys, tel_keys, freshness_year
         ):
-            print(f"  skip {event_name} ({year}) (already in CSV)")
+            print(f"  skip {csv_race_name} ({year}) (already in CSV)")
             skipped += 1
             return
 
-        label = f"{event_name} ({year})"
+        label = f"{fastf1_event} ({year}) → CSV {csv_race_name!r}"
         try:
             print(f"  loading {label} …")
             session = load_session_with_retry(
                 year,
-                event_name,
+                fastf1_event,
                 rate_limit_wait=rate_limit_wait,
                 rate_limit_retries=rate_limit_retries,
             )
             team_engine = team_to_engine_map(year)
 
             lap_chunk = collect_lap_times_from_session(
-                session, year, event_name, team_engine
+                session, year, csv_race_name, team_engine
             )
             if lap_chunk is not None and not lap_chunk.empty:
-                lap_df = drop_race_year_rows(lap_df, "Race", event_name, year)
+                lap_df = drop_race_year_rows(lap_df, "Race", csv_race_name, year)
                 lap_df = pd.concat([lap_df, lap_chunk], ignore_index=True)
-                lap_keys.add((event_name, year))
+                lap_keys.add((csv_race_name, year))
                 print(f"    {len(lap_chunk)} lap rows")
 
             tel_chunk = collect_fastest_lap_telemetry_from_session(
-                session, year, event_name, max_telemetry_points
+                session, year, csv_race_name, max_telemetry_points
             )
             if tel_chunk is not None and not tel_chunk.empty:
-                tel_df = drop_race_year_rows(tel_df, "Track", event_name, year)
+                tel_df = drop_race_year_rows(tel_df, "Track", csv_race_name, year)
                 tel_df = pd.concat([tel_df, tel_chunk], ignore_index=True)
-                tel_keys.add((event_name, year))
+                tel_keys.add((csv_race_name, year))
                 print(f"    {len(tel_chunk)} telemetry rows")
 
             fetched += 1
@@ -603,16 +665,21 @@ def collect(
                     print(f"  skip {canonical} ({year}): not on {year} schedule")
                     skipped += 1
                     continue
-                process_session(year, event_name)
+                process_session(year, event_name, canonical)
     else:
         for year in years:
             events = event_names_for_year(year)
             print(f"Year {year}: {len(events)} events on schedule")
 
             for event_name in events:
-                process_session(year, event_name)
+                process_session(year, event_name, canonical_race_name(event_name))
 
     print(f"Sessions fetched: {fetched}, skipped: {skipped}")
+
+    if not lap_df.empty and "Race" in lap_df.columns:
+        lap_df["Race"] = lap_df["Race"].map(lambda r: canonical_race_name(str(r)))
+    if not tel_df.empty and "Track" in tel_df.columns:
+        tel_df["Track"] = tel_df["Track"].map(lambda r: canonical_race_name(str(r)))
 
     if lap_df.empty:
         print("No lap rows in output.", file=sys.stderr)
@@ -707,7 +774,7 @@ def main() -> int:
     parser.add_argument(
         "--lookback-days",
         type=int,
-        default=8,
+        default=14,
         help="With --weekly, refresh GPs whose race date fell within this many days (UTC)",
     )
     parser.add_argument(

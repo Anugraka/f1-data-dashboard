@@ -41,7 +41,9 @@ Schedule: **Mondays 06:00 UTC**. Scheduled runs use **`--weekly`**:
 
 **First-time / missing tracks:** run manually with **events** set to one GP at a time, e.g. `Monaco Grand Prix` (workflow input or `--events "Monaco Grand Prix"`). Repeat per circuit until the repo has full history. **Full calendar in one job** still risks rate limits.
 
-**Manual weekly override:** Actions → **events** = `Miami Grand Prix` to force-refresh that track for all years.
+**Manual weekly override:** Actions → **events** = `Canadian Grand Prix` (or whichever GP just ran) to force-refresh that track for all years.
+
+**Sidebar missing a new GP?** The track needs rows in both lap and telemetry CSVs as **`Canadian Grand Prix`**. Re-run with **events** = `Canadian Grand Prix`, then deploy.
 
 Job timeout: **3 hours**.
 

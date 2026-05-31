@@ -1,5 +1,6 @@
 import { ENGINE_COLORS } from './engineColors'
 import type { EngineManufacturer, TeamLap, YearBestTeamLap } from '../types'
+import { racesMatch } from './raceNameCanonical'
 
 export type SectorKey = 'LapTime' | 'Sector1Time' | 'Sector2Time' | 'Sector3Time'
 
@@ -162,7 +163,7 @@ export function averageLapTimesByTeam(rows: LapTimesRow[], opts: { race: string;
   const { race, year, sector } = opts
 
   const filtered = rows.filter((r) => {
-    if ((r.Race ?? '').trim() !== race) return false
+    if (!racesMatch(r.Race ?? '', race)) return false
     if (year && (r.Year ?? '').trim() !== year) return false
     if ((r.Deleted ?? '').trim().toLowerCase() === 'true') return false
     return true
@@ -195,7 +196,7 @@ export function averageLapTimesByTeam(rows: LapTimesRow[], opts: { race: string;
 
 export function countRowsForRaceYear(rows: LapTimesRow[], race: string, year?: string) {
   return rows.filter((r) => {
-    if ((r.Race ?? '').trim() !== race) return false
+    if (!racesMatch(r.Race ?? '', race)) return false
     if (year && (r.Year ?? '').trim() !== year) return false
     if ((r.Deleted ?? '').trim().toLowerCase() === 'true') return false
     return true
@@ -205,7 +206,7 @@ export function countRowsForRaceYear(rows: LapTimesRow[], race: string, year?: s
 export function latestYearForRace(rows: LapTimesRow[], race: string) {
   let best: number | null = null
   for (const r of rows) {
-    if ((r.Race ?? '').trim() !== race) continue
+    if (!racesMatch(r.Race ?? '', race)) continue
     const y = Number((r.Year ?? '').trim())
     if (!Number.isFinite(y)) continue
     if (best == null || y > best) best = y
@@ -217,7 +218,7 @@ export function latestYearForRace(rows: LapTimesRow[], race: string) {
 export function yearsForRace(rows: LapTimesRow[], race: string): string[] {
   const set = new Set<string>()
   for (const r of rows) {
-    if ((r.Race ?? '').trim() !== race) continue
+    if (!racesMatch(r.Race ?? '', race)) continue
     const y = (r.Year ?? '').trim()
     if (y) set.add(y)
   }

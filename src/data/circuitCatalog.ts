@@ -1,4 +1,5 @@
 import type { Circuit, TrackSegment } from '../types'
+import { canonicalRaceName } from './raceNameCanonical'
 import { STATIC_THUMB_SECTORS } from './staticCircuitThumbs'
 
 /** Display/metadata overrides keyed by FastF1 `EventName` / CSV `Race`. */
@@ -68,14 +69,24 @@ export const CIRCUIT_CATALOG: CircuitCatalogEntry[] = [
     sectorCsvTrack: 'Miami',
     positionsUrlSlug: 'miami',
   },
+  {
+    fastF1RaceName: 'Canadian Grand Prix',
+    id: 'canada',
+    name: 'Canadian',
+    sidebarLabel: 'Montreal',
+    fullName: 'Circuit Gilles Villeneuve',
+    country: 'Canada',
+    positionsUrlSlug: 'canada',
+  },
 ]
 
 const catalogByRace = new Map(CIRCUIT_CATALOG.map((e) => [e.fastF1RaceName, e]))
 
 export function catalogEntryForRace(raceName: string): CircuitCatalogEntry {
-  const hit = catalogByRace.get(raceName.trim())
+  const canonical = canonicalRaceName(raceName.trim())
+  const hit = catalogByRace.get(canonical)
   if (hit) return hit
-  return defaultCatalogEntry(raceName)
+  return defaultCatalogEntry(canonical)
 }
 
 export function slugFromGrandPrix(raceName: string): string {
@@ -89,15 +100,15 @@ export function slugFromGrandPrix(raceName: string): string {
   return slug || 'circuit'
 }
 
-function defaultCatalogEntry(raceName: string): CircuitCatalogEntry {
-  const stem = raceName.replace(/\s+Grand Prix$/i, '').trim() || raceName
+function defaultCatalogEntry(canonicalGp: string): CircuitCatalogEntry {
+  const stem = canonicalGp.replace(/\s+Grand Prix$/i, '').trim() || canonicalGp
   return {
-    fastF1RaceName: raceName,
-    id: slugFromGrandPrix(raceName),
+    fastF1RaceName: canonicalGp,
+    id: slugFromGrandPrix(canonicalGp),
     name: stem,
-    fullName: raceName,
+    fullName: canonicalGp,
     country: stem,
-    positionsUrlSlug: slugFromGrandPrix(raceName),
+    positionsUrlSlug: slugFromGrandPrix(canonicalGp),
   }
 }
 

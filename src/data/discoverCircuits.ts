@@ -7,22 +7,22 @@ import {
   thumbSectorsForCatalogEntry,
 } from './circuitCatalog'
 import { compareCircuitsBy2026Calendar } from './raceOrder2026'
+import { canonicalRaceName, racesMatch } from './raceNameCanonical'
 import { buildThumbSectorsFromTelemetry } from './buildThumbSectors'
 import type { Circuit } from '../types'
 import { latestYearForTrack, pickDriverWithMostPoints } from './telemetry'
 
-function uniqueRacesFromLaps(rows: LapTimesRow[]): string[] {
+function uniqueCanonicalRacesFromLaps(rows: LapTimesRow[]): string[] {
   const set = new Set<string>()
   for (const r of rows) {
     const race = (r.Race ?? '').trim()
-    if (race) set.add(race)
+    if (race) set.add(canonicalRaceName(race))
   }
   return [...set].sort((a, b) => a.localeCompare(b))
 }
 
-function hasTelemetryForRace(points: TelemetryPoint[], race: string): boolean {
-  const t = race.trim()
-  return points.some((p) => (p.track ?? '').trim() === t)
+function hasTelemetryForRace(points: TelemetryPoint[], canonicalRace: string): boolean {
+  return points.some((p) => racesMatch(p.track ?? '', canonicalRace))
 }
 
 function representativeLapXY(
@@ -60,7 +60,9 @@ export function discoverCircuitsFromData(
   telemetry: TelemetryPoint[],
   sectorPositions: Map<string, SectorBoundaries> | null,
 ): Circuit[] {
-  const races = uniqueRacesFromLaps(lapRows).filter((race) => hasTelemetryForRace(telemetry, race))
+  const races = uniqueCanonicalRacesFromLaps(lapRows).filter((race) =>
+    hasTelemetryForRace(telemetry, race),
+  )
 
   const circuits: Circuit[] = []
   for (const race of races) {

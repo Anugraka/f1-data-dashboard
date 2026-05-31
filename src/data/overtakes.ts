@@ -1,3 +1,5 @@
+import { racesMatch } from './raceNameCanonical'
+
 export type OvertakeSeasonRow = {
   year: string
   race: string
@@ -85,8 +87,7 @@ export async function loadOvertakeDataCsv(path = '/data/overtake_data.csv') {
 
 /** Rows for one grand prix name (must match `fastF1RaceName` / CSV `Race`), sorted by year ascending. */
 export function overtakesForRace(rows: OvertakeSeasonRow[], raceName: string): OvertakeSeasonRow[] {
-  const r = raceName.trim()
   return rows
-    .filter((x) => (x.race ?? '').trim() === r)
+    .filter((x) => racesMatch(x.race ?? '', raceName))
     .sort((a, b) => Number(a.year) - Number(b.year))
 }
